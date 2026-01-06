@@ -21,7 +21,7 @@ class URL:
             self.host, port = self.host.split(":", 1)
             self.port = int(port)
 
-    def request(self):
+    def request(self, headers={}):
         s = socket.socket(
             family=socket.AF_INET,
             type=socket.SOCK_STREAM,
@@ -34,8 +34,11 @@ class URL:
         address = (self.host, self.port)
         s.connect(address)
 
-        request = f"GET {self.path} HTTP/1.0\r\n"
+        request = f"GET {self.path} HTTP/1.1\r\n"
         request += f"Host: {self.host}\r\n"
+        request += "Connection: close\r\n"
+        for key, value in headers.items():
+            request += f"{key}: {value}\r\n"
         request += "\r\n"
         s.send(request.encode("utf8"))
 
