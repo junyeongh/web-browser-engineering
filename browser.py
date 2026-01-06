@@ -3,10 +3,12 @@ import ssl
 
 
 class URL:
-    schemes = ["http", "https", "file"]
+    schemes = ["http", "https", "file", "data"]
 
     def __init__(self, url):
-        self.scheme, url = url.split("://", 1)
+        self.scheme, url = url.split(":", 1)
+        url = url.lstrip("//")
+
         assert self.scheme in self.schemes
 
         match self.scheme:
@@ -29,6 +31,14 @@ class URL:
                 self.host = None
                 self.path = url
                 self.port = None
+
+            case "data":
+                self.host = None
+                self.path = None
+                self.port = None
+
+                self.mime, self.data = url.split(",", 1)
+                self.mime_type, self.mime_subtype = self.mime.split("/")
 
     def request(self, headers={}):
         match self.scheme:
@@ -82,6 +92,13 @@ class URL:
                     with open("./src/index.html") as f:
                         body = f.read()
                         return body
+
+            case "data":
+                match self.mime:
+                    case "text/html":
+                        return f"<html><head></head><body>{self.data}</body></html>\r\n"
+                    case _:
+                        return self.data
 
 
 def show(body):
