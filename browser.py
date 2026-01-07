@@ -103,16 +103,22 @@ class URL:
 
 def show(body):
     _in_tag = False
+
+    r = ""
     for c in body:
-        print(c, end="")
+        r += c
         match c:
             case "<":
                 _in_tag = True
             case ">":
                 _in_tag = False
             case _:
-                # print(c, end="")
                 pass
+
+    r = r.replace("&lt;", "<")
+    r = r.replace("&gt;", ">")
+
+    print(r, end="")
 
 
 def load(url):
