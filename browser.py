@@ -3,13 +3,20 @@ import ssl
 
 
 class URL:
-    schemes = ["http", "https", "file", "data"]
+    schemes = ["http", "https", "file", "data", "view-source"]
+
+    view_source = False
 
     def __init__(self, url):
         self.scheme, url = url.split(":", 1)
         url = url.lstrip("//")
 
         assert self.scheme in self.schemes
+
+        if self.scheme == "view-source":
+            self.view_source = True
+            self.scheme, url = url.split(":", 1)
+            url = url.lstrip("//")
 
         match self.scheme:
             case "http" | "https":
@@ -81,6 +88,10 @@ class URL:
                 body = response.read()
                 s.close()
 
+                # 현재는 차이가 없음
+                if self.view_source:
+                    print(body)
+
                 return body
 
             case "file":
@@ -129,7 +140,8 @@ def load(url):
 def main():
     import sys
 
-    load(URL(sys.argv[1]))
+    url = URL(sys.argv[1])
+    load(url)
 
 
 if __name__ == "__main__":
