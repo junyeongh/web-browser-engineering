@@ -3,8 +3,11 @@ import ssl
 
 
 class URL:
+    # constants
     schemes = ["http", "https", "file", "data", "view-source"]
 
+    # variables
+    sockets = {}
     view_source = False
 
     def __init__(self, url):
@@ -48,23 +51,31 @@ class URL:
                 self.mime_type, self.mime_subtype = self.mime.split("/")
 
     def request(self, headers={}):
+        socket_cache = (self.scheme, self.host, self.port)
+
+        is_cached = socket_cache in URL.sockets
+        if is_cached:
+            s = URL.sockets[socket_cache]
+        else:
+            s = socket.socket(
+                family=socket.AF_INET,
+                type=socket.SOCK_STREAM,
+                proto=socket.IPPROTO_TCP,
+            )
+            if self.scheme == "https":
+                ctx = ssl.create_default_context()
+                s = ctx.wrap_socket(s, server_hostname=self.host)
+
+            address = (self.host, self.port)
+            s.connect(address)
+
+            URL.sockets[socket_cache] = s
+
         match self.scheme:
             case "http" | "https":
-                s = socket.socket(
-                    family=socket.AF_INET,
-                    type=socket.SOCK_STREAM,
-                    proto=socket.IPPROTO_TCP,
-                )
-                if self.scheme == "https":
-                    ctx = ssl.create_default_context()
-                    s = ctx.wrap_socket(s, server_hostname=self.host)
-
-                address = (self.host, self.port)
-                s.connect(address)
-
                 request = f"GET {self.path} HTTP/1.1\r\n"
                 request += f"Host: {self.host}\r\n"
-                request += "Connection: close\r\n"
+                request += "Connection: keep-alive\r\n"
                 for key, value in headers.items():
                     request += f"{key}: {value}\r\n"
                 request += "\r\n"
@@ -82,11 +93,32 @@ class URL:
                     header, value = line.split(":", 1)
                     response_headers[header.casefold()] = value.strip()
 
-                # assert "transfer-encoding" not in response_headers
-                assert "content-encoding" not in response_headers
+                if "transfer-encoding" in response_headers and response_headers["transfer-encoding"] == "chunked":
+                    # Read chunked response
+                    body = ""
+                    while True:
+                        # Read chunk size line
+                        chunk_size_line = response.readline()
+                        chunk_size = int(chunk_size_line.strip(), 16)  # Parse hex
 
-                body = response.read()
-                s.close()
+                        if chunk_size == 0:
+                            # Last chunk, read trailing \r\n and we're done
+                            response.readline()
+                            break
+
+                        # Read chunk data
+                        chunk_data = response.read(chunk_size)
+                        body += chunk_data
+
+                        # Read trailing \r\n after chunk data
+                        response.readline()
+                elif "content-length" in response_headers:
+                    content_length = int(response_headers["content-length"])
+                    body = response.read(content_length)
+                # else:
+                #     body = response.read()
+                #     s.close()
+                #     del URL.sockets[socket_cache]
 
                 # 현재는 차이가 없음
                 if self.view_source:
@@ -133,7 +165,11 @@ def show(body):
 
 
 def load(url):
-    body = url.request()
+    body = url.request(
+        {
+            "User-Agent": "Mozilla/5.0",
+        }
+    )
     show(body)
 
 
